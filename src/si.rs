@@ -1,3 +1,5 @@
+//! The SI unit system, including base units, prefixes, and derived units.
+
 #![allow(non_camel_case_types)]
 
 mod inner {
@@ -19,6 +21,8 @@ pub use self::inner::Si;
 pub use self::prefixes::*;
 
 pub mod prefixes {
+    //! SI prefixes.
+
     use crate::{Mul, TenTo};
 
     pub type quecto<U> = Mul<U, TenTo<-30>>;
@@ -49,9 +53,11 @@ pub mod prefixes {
 }
 
 pub mod base {
+    //! SI base units.
+
     use super::Si;
 
-    pub type unit = Si<0, 0, 0, 0, 0, 0, 0, 0, 0>;
+    pub type unitless = Si<0, 0, 0, 0, 0, 0, 0, 0, 0>;
     pub type s = Si<0, 1, 0, 0, 0, 0, 0, 0, 0>;
     pub type m = Si<0, 0, 1, 0, 0, 0, 0, 0, 0>;
     pub type kg = Si<0, 0, 0, 1, 0, 0, 0, 0, 0>;
@@ -63,10 +69,12 @@ pub mod base {
 }
 
 pub mod derived {
+    //! SI derived units.
+
     use crate::si::base::*;
     use crate::{Div, Mul};
 
-    pub type Hz = Div<unit, s>;
+    pub type Hz = Div<unitless, s>;
     pub type N = Mul<kg, Div<m, Mul<s, s>>>;
     pub type Pa = Div<N, Mul<m, m>>;
     pub type J = Mul<m, N>;

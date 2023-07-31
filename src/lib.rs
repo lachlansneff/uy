@@ -15,6 +15,7 @@ pub mod si;
 /// ```
 pub struct TenTo<const N: i8>;
 
+/// Multiply by a power of ten.
 pub trait MulPowerOfTen {
     fn mul_power_of_ten(self, exp: i8) -> Self;
 }
@@ -62,7 +63,7 @@ macro_rules! power_of_ten_unit_system {
                 fn to_const(self) -> Self::Output { Si }
             }
 
-            #[derive(Debug)]
+            #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub struct $system<const EXP: i8, $(const [<$unit:upper>]: i8),*>;
 
             impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::Unit for $system<EXP, $({ [<$unit:upper>] }),*> {}
@@ -182,6 +183,7 @@ pub type Mul<A, B> = <A as ops::Mul<B>>::Output;
 /// Divide a unit by another unit or [`TenTo`].
 pub type Div<A, B> = <A as ops::Div<B>>::Output;
 
+/// Convert a value between different units.
 pub trait UnitConvert<T, From>: Unit {
     fn unit_convert(val: T) -> T;
 }
@@ -204,7 +206,7 @@ impl<T, U: Unit> Quantity<T, U> {
     }
 
     /// Convert between quantities with different units or the same units
-    /// with difference scales.
+    /// with different scales.
     ///
     /// ```rust
     /// # use uy::{si, Quantity};
