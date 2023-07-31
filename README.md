@@ -15,7 +15,10 @@ To convert between types like that, call the `.convert()` method on `Quantity`.
 ```rust
 use uy::{Quantity, si};
 
-fn how_long(d: Quantity<f32, si::m>, v: Quantity<f32, uy::Div<si::m, si::s>>) -> Quantity<f32, si::s> {
+fn how_long(
+    d: Quantity<f32, si::m>,
+    v: Quantity<f32, uy::Div<si::m, si::s>>
+) -> Quantity<f32, si::s> {
     d / v
 }
 ```

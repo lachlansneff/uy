@@ -1,6 +1,6 @@
 [package]
 name = "uy"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Lachlan Sneff <lachlan@hyperturing.com>"]
 description = "A typesafe, flexible, simple, and user-friendly unit system library for Rust that has good error messages."
