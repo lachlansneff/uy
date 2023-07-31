@@ -8,8 +8,48 @@ use std::ops::DerefMut;
 mod inner;
 pub mod si;
 
-pub struct TenTo<const N: isize>;
+/// Used for multiplying a unit by 10ⁿ.
+///
+/// ```rust
+/// type Millimeter = uy::Mul<uy::si::m, uy::TenTo<-3>>;
+/// ```
+pub struct TenTo<const N: i8>;
 
+pub trait MulPowerOfTen {
+    fn mul_power_of_ten(self, exp: i8) -> Self;
+}
+
+macro_rules! impl_mul_power_of_ten {
+    ($($ty:ty),*) => {
+        $(
+            impl MulPowerOfTen for $ty {
+                fn mul_power_of_ten(self, exp: i8) -> Self {
+                    if exp < 0 {
+                        self * (10 as $ty).pow(-exp as u32)
+                    } else {
+                        self / (10 as $ty).pow(exp as u32)
+                    }
+                }
+            }
+        )*
+    };
+}
+
+impl_mul_power_of_ten!(i8, i16, i32, i64, isize, u8, u16, u32, u64, u128);
+
+impl MulPowerOfTen for f32 {
+    fn mul_power_of_ten(self, exp: i8) -> Self {
+        self * 10f32.powi(exp as i32)
+    }
+}
+
+impl MulPowerOfTen for f64 {
+    fn mul_power_of_ten(self, exp: i8) -> Self {
+        self * 10f64.powi(exp as i32)
+    }
+}
+
+/// Marker trait for unit systems.
 pub trait Unit {}
 
 macro_rules! power_of_ten_unit_system {
@@ -17,20 +57,20 @@ macro_rules! power_of_ten_unit_system {
         ::paste::paste! {
             pub struct [<Typenum $system>]<EXP, $([<$unit:camel>]),*>(std::marker::PhantomData<(EXP, $([<$unit:camel>]),*)>);
 
-            impl<const EXP: isize, $(const [<$unit:upper>]: isize),*> crate::inner::ToConst for [<Typenum $system>]<crate::inner::Const<EXP>, $(crate::inner::Const<{ [<$unit:upper>] }>),*> {
+            impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::inner::ToConst for [<Typenum $system>]<crate::inner::Const<EXP>, $(crate::inner::Const<{ [<$unit:upper>] }>),*> {
                 type Output = $system<EXP, $({ [<$unit:upper>] }),*>;
                 fn to_const(self) -> Self::Output { Si }
             }
 
             #[derive(Debug)]
-            pub struct $system<const EXP: isize, $(const [<$unit:upper>]: isize),*>;
+            pub struct $system<const EXP: i8, $(const [<$unit:upper>]: i8),*>;
 
-            impl<const EXP: isize, $(const [<$unit:upper>]: isize),*> crate::Unit for $system<EXP, $({ [<$unit:upper>] }),*> {}
+            impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::Unit for $system<EXP, $({ [<$unit:upper>] }),*> {}
 
             impl<
-                const EXP: isize,
-                const N: isize,
-                $(const [<$unit:upper>]: isize),*
+                const EXP: i8,
+                const N: i8,
+                $(const [<$unit:upper>]: i8),*
             > std::ops::Mul<crate::TenTo<{ N }>> for $system<EXP, $({ [<$unit:upper>] }),*>
             where
                 crate::inner::Const<EXP>: std::ops::Add<crate::inner::Const<N>>,
@@ -50,9 +90,9 @@ macro_rules! power_of_ten_unit_system {
             }
 
             impl<
-                const EXP: isize,
-                const N: isize,
-                $(const [<$unit:upper>]: isize),*
+                const EXP: i8,
+                const N: i8,
+                $(const [<$unit:upper>]: i8),*
             > std::ops::Div<crate::TenTo<N>> for $system<EXP, $({ [<$unit:upper>] }),*>
             where
                 crate::inner::Const<EXP>: std::ops::Sub<crate::inner::Const<N>>,
@@ -72,9 +112,9 @@ macro_rules! power_of_ten_unit_system {
             }
 
             impl<
-                const EXP1: isize,
-                const EXP2: isize,
-                $(const [<$unit:upper 1>]: isize, const [<$unit:upper 2>]: isize),*
+                const EXP1: i8,
+                const EXP2: i8,
+                $(const [<$unit:upper 1>]: i8, const [<$unit:upper 2>]: i8),*
             > std::ops::Mul<$system<EXP2, $({ [<$unit:upper 2>] }),*>> for $system<EXP1, $({ [<$unit:upper 1>] }),*>
             where
                 crate::inner::Const<EXP1>: std::ops::Add<crate::inner::Const<EXP2>>,
@@ -96,9 +136,9 @@ macro_rules! power_of_ten_unit_system {
             }
 
             impl<
-                const EXP1: isize,
-                const EXP2: isize,
-                $(const [<$unit:upper 1>]: isize, const [<$unit:upper 2>]: isize),*
+                const EXP1: i8,
+                const EXP2: i8,
+                $(const [<$unit:upper 1>]: i8, const [<$unit:upper 2>]: i8),*
             > std::ops::Div<$system<EXP2, $([<$unit:upper 2>]),*>> for $system<EXP1, $([<$unit:upper 1>]),*>
             where
                 crate::inner::Const<EXP1>: std::ops::Sub<crate::inner::Const<EXP2>>,
@@ -118,26 +158,62 @@ macro_rules! power_of_ten_unit_system {
                     crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
                 }
             }
+
+            impl<
+                T,
+                const EXP1: i8,
+                const EXP2: i8,
+                $(const [<$unit:upper>]: i8),*
+            > crate::UnitConvert<T, $system<EXP1, $([<$unit:upper>]),*>> for $system<EXP2, $([<$unit:upper>]),*>
+            where
+                T: crate::MulPowerOfTen,
+            {
+                fn unit_convert(val: T) -> T {
+                    val.mul_power_of_ten(EXP2 - EXP1)
+                }
+            }
         }
     }
 }
 pub(crate) use power_of_ten_unit_system;
 
+/// Multiply a unit by another unit or [`TenTo`].
 pub type Mul<A, B> = <A as ops::Mul<B>>::Output;
+/// Divide a unit by another unit or [`TenTo`].
 pub type Div<A, B> = <A as ops::Div<B>>::Output;
 
+pub trait UnitConvert<T, From>: Unit {
+    fn unit_convert(val: T) -> T;
+}
+
+/// A physical quantity with a defined unit.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct Quantity<T, U: Unit> {
     val: T,
     _marker: PhantomData<U>,
 }
 
 impl<T, U: Unit> Quantity<T, U> {
+    /// Create a quantity from a value.
     pub fn new(val: T) -> Self {
         Self {
             val,
             _marker: PhantomData,
         }
+    }
+
+    /// Convert between quantities with different units or the same units
+    /// with difference scales.
+    ///
+    /// ```rust
+    /// # use uy::{si, Quantity};
+    /// let a: Quantity<i32, si::m> = Quantity::new(3);
+    /// let b: Quantity<i32, si::milli<si::m>> = a.convert();
+    /// assert_eq!(*b, 3000);
+    /// ```
+    pub fn convert<Y: UnitConvert<T, U>>(self) -> Quantity<T, Y> {
+        Quantity::new(Y::unit_convert(self.val))
     }
 }
 
@@ -152,6 +228,12 @@ impl<T, U: Unit> Deref for Quantity<T, U> {
 impl<T, U: Unit> DerefMut for Quantity<T, U> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.val
+    }
+}
+
+impl<T, U: Unit> From<T> for Quantity<T, U> {
+    fn from(val: T) -> Self {
+        Self::new(val)
     }
 }
 

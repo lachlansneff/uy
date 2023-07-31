@@ -1,9 +1,9 @@
 use std::ops;
 use typenum;
 
-pub struct Const<const I: isize>;
+pub struct Const<const I: i8>;
 
-impl<const A: isize, const B: isize> ops::Add<Const<B>> for Const<A>
+impl<const A: i8, const B: i8> ops::Add<Const<B>> for Const<A>
 where
     Self: ToTypenum,
     Const<B>: ToTypenum,
@@ -16,7 +16,7 @@ where
     }
 }
 
-impl<const A: isize, const B: isize> ops::Sub<Const<B>> for Const<A>
+impl<const A: i8, const B: i8> ops::Sub<Const<B>> for Const<A>
 where
     Self: ToTypenum,
     Const<B>: ToTypenum,
@@ -29,7 +29,7 @@ where
     }
 }
 
-impl<const A: isize, const B: isize> ops::Mul<Const<B>> for Const<A>
+impl<const A: i8, const B: i8> ops::Mul<Const<B>> for Const<A>
 where
     Self: ToTypenum,
     Const<B>: ToTypenum,
@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<const A: isize, const B: isize> ops::Div<Const<B>> for Const<A>
+impl<const A: i8, const B: i8> ops::Div<Const<B>> for Const<A>
 where
     Self: ToTypenum,
     Const<B>: ToTypenum,
@@ -55,7 +55,7 @@ where
     }
 }
 
-impl<const N: isize> ops::Neg for Const<N>
+impl<const N: i8> ops::Neg for Const<N>
 where
     Self: ToTypenum,
     <Self as ToTypenum>::Output: ops::Neg,
@@ -80,7 +80,7 @@ pub trait ToConst {
 macro_rules! impl_to_typenum {
     ($($num:ident),*) => {
         $(
-            impl ToTypenum for Const<{ <typenum::$num as typenum::Integer>::ISIZE }> {
+            impl ToTypenum for Const<{ <typenum::$num as typenum::Integer>::I8 }> {
                 type Output = typenum::$num;
                 fn to_typenum(self) -> Self::Output {
                     typenum::$num::new()
@@ -88,7 +88,7 @@ macro_rules! impl_to_typenum {
             }
 
             impl ToConst for typenum::$num {
-                type Output = Const<{ <typenum::$num as typenum::Integer>::ISIZE }>;
+                type Output = Const<{ <typenum::$num as typenum::Integer>::I8 }>;
                 fn to_const(self) -> Self::Output {
                     Const
                 }
