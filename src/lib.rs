@@ -335,3 +335,9 @@ where
         }
     }
 }
+
+#[cfg(doctest)]
+mod test_readme {
+    #[doc = include_str!("../README.md")]
+    extern "C" {}
+}
