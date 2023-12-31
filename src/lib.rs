@@ -40,13 +40,13 @@ impl_mul_power_of_ten!(i8, i16, i32, i64, isize, u8, u16, u32, u64, u128);
 
 impl MulPowerOfTen for f32 {
     fn mul_power_of_ten(self, exp: i8) -> Self {
-        self * 10f32.powi(exp as i32)
+        self * 10f32.powi(-exp as i32)
     }
 }
 
 impl MulPowerOfTen for f64 {
     fn mul_power_of_ten(self, exp: i8) -> Self {
-        self * 10f64.powi(exp as i32)
+        self * 10f64.powi(-exp as i32)
     }
 }
 
