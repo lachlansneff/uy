@@ -17,7 +17,7 @@ let speed: si::meters_per_second<f32> = distance / time;
 
 ```toml
 [dependencies]
-uy = "0.1"
+uy = "0.2"
 ```
 
 ## Usage
