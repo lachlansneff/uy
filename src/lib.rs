@@ -9,7 +9,7 @@ pub use quantity::Quantity;
 /// Used for multiplying a unit by 10ⁿ.
 ///
 /// ```rust
-/// type Millimeter = uy::Mul<uy::si::m, uy::TenTo<-3>>;
+/// type Millimeter = uy::Mul<uy::si::units::m, uy::TenTo<-3>>;
 /// ```
 pub struct TenTo<const N: i8>;
 
@@ -272,28 +272,28 @@ mod tests {
 
     #[test]
     fn quantity_new_and_deref() {
-        let q: Quantity<i32, si::m> = Quantity::new(42);
+        let q: si::meters<i32> = Quantity::new(42);
         assert_eq!(*q, 42);
     }
 
     #[test]
     fn quantity_from_trait() {
-        let q: Quantity<i32, si::m> = 42.into();
+        let q: si::meters<i32> = 42.into();
         assert_eq!(*q, 42);
     }
 
     #[test]
     fn quantity_deref_mut() {
-        let mut q: Quantity<i32, si::kg> = Quantity::new(100);
+        let mut q: si::kilograms<i32> = Quantity::new(100);
         *q = 200;
         assert_eq!(*q, 200);
     }
 
     #[test]
     fn quantity_equality_and_ordering() {
-        let a: Quantity<i32, si::m> = Quantity::new(5);
-        let b: Quantity<i32, si::m> = Quantity::new(5);
-        let c: Quantity<i32, si::m> = Quantity::new(10);
+        let a: si::meters<i32> = Quantity::new(5);
+        let b: si::meters<i32> = Quantity::new(5);
+        let c: si::meters<i32> = Quantity::new(10);
         assert_eq!(a, b);
         assert!(a < c);
         assert_eq!(a.cmp(&c), cmp::Ordering::Less);
@@ -304,8 +304,8 @@ mod tests {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        let a: Quantity<i32, si::m> = Quantity::new(42);
-        let b: Quantity<i32, si::m> = Quantity::new(42);
+        let a: si::meters<i32> = Quantity::new(42);
+        let b: si::meters<i32> = Quantity::new(42);
 
         let mut hasher_a = DefaultHasher::new();
         let mut hasher_b = DefaultHasher::new();
@@ -320,8 +320,8 @@ mod tests {
 
     #[test]
     fn add_sub_same_units() {
-        let a: Quantity<i32, si::m> = Quantity::new(10);
-        let b: Quantity<i32, si::m> = Quantity::new(3);
+        let a: si::meters<i32> = Quantity::new(10);
+        let b: si::meters<i32> = Quantity::new(3);
         assert_eq!(*(a + b), 13);
         assert_eq!(*(a - b), 7);
     }
@@ -329,21 +329,21 @@ mod tests {
     #[test]
     fn mul_div_combines_units() {
         // m * m = m^2, m^2 / m = m
-        let a: Quantity<i32, si::m> = Quantity::new(6);
-        let b: Quantity<i32, si::m> = Quantity::new(4);
-        let area: Quantity<i32, Mul<si::m, si::m>> = a * b;
+        let a: si::meters<i32> = Quantity::new(6);
+        let b: si::meters<i32> = Quantity::new(4);
+        let area: si::square_meters<i32> = a * b;
         assert_eq!(*area, 24);
 
-        let c: Quantity<i32, si::m> = Quantity::new(3);
-        let result: Quantity<i32, si::m> = area / c;
+        let c: si::meters<i32> = Quantity::new(3);
+        let result: si::meters<i32> = area / c;
         assert_eq!(*result, 8);
     }
 
     #[test]
     fn division_to_unitless() {
-        let a: Quantity<i32, si::m> = Quantity::new(10);
-        let b: Quantity<i32, si::m> = Quantity::new(5);
-        let ratio: Quantity<i32, si::unitless> = a / b;
+        let a: si::meters<i32> = Quantity::new(10);
+        let b: si::meters<i32> = Quantity::new(5);
+        let ratio: si::unitless<i32> = a / b;
         assert_eq!(*ratio, 2);
     }
 
@@ -374,26 +374,26 @@ mod tests {
     #[test]
     fn conversion_scales_correctly() {
         // m -> mm (scale up by 1000)
-        let meters: Quantity<i32, si::m> = Quantity::new(3);
-        let mm: Quantity<i32, si::milli<si::m>> = meters.convert();
+        let meters: si::meters<i32> = Quantity::new(3);
+        let mm: Quantity<i32, si::milli<si::units::m>> = meters.convert();
         assert_eq!(*mm, 3000);
 
         // mm -> m (scale down by 1000)
-        let back: Quantity<i32, si::m> = mm.convert();
+        let back: si::meters<i32> = mm.convert();
         assert_eq!(*back, 3);
     }
 
     #[test]
     fn conversion_float() {
-        let km: Quantity<f64, si::kilo<si::m>> = Quantity::new(2.5);
-        let m: Quantity<f64, si::m> = km.convert();
+        let km: Quantity<f64, si::kilo<si::units::m>> = Quantity::new(2.5);
+        let m: si::meters<f64> = km.convert();
         assert!((2500.0 - *m).abs() < f64::EPSILON);
     }
 
     #[test]
     fn conversion_identity() {
-        let m: Quantity<i32, si::m> = Quantity::new(42);
-        let m2: Quantity<i32, si::m> = m.convert();
+        let m: si::meters<i32> = Quantity::new(42);
+        let m2: si::meters<i32> = m.convert();
         assert_eq!(*m, *m2);
     }
 
@@ -403,23 +403,23 @@ mod tests {
 
     #[test]
     fn velocity_times_time_gives_distance() {
-        let velocity: Quantity<f64, Div<si::m, si::s>> = Quantity::new(10.0);
-        let time: Quantity<f64, si::s> = Quantity::new(5.0);
-        let distance: Quantity<f64, si::m> = velocity * time;
+        let velocity: si::meters_per_second<f64> = Quantity::new(10.0);
+        let time: si::seconds<f64> = Quantity::new(5.0);
+        let distance: si::meters<f64> = velocity * time;
         assert!((50.0 - *distance).abs() < f64::EPSILON);
     }
 
     #[test]
     fn derived_unit_algebra() {
         // kg * (m / s^2) = N
-        let mass: Quantity<f64, si::kg> = Quantity::new(10.0);
-        let accel: Quantity<f64, Div<si::m, Mul<si::s, si::s>>> = Quantity::new(5.0);
-        let force: Quantity<f64, si::N> = mass * accel;
+        let mass: si::kilograms<f64> = Quantity::new(10.0);
+        let accel: si::meters_per_second_squared<f64> = Quantity::new(5.0);
+        let force: si::newtons<f64> = mass * accel;
         assert!((50.0 - *force).abs() < f64::EPSILON);
 
         // N * m = J
-        let distance: Quantity<f64, si::m> = Quantity::new(2.0);
-        let energy: Quantity<f64, si::J> = force * distance;
+        let distance: si::meters<f64> = Quantity::new(2.0);
+        let energy: si::joules<f64> = force * distance;
         assert!((100.0 - *energy).abs() < f64::EPSILON);
     }
 }

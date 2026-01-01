@@ -5,9 +5,9 @@ Compile-time unit safety for Rust. Catches unit errors at compile time with zero
 ```rust
 use uy::{Quantity, si};
 
-let distance: Quantity<f32, si::m> = Quantity::new(100.0);
-let time: Quantity<f32, si::s> = Quantity::new(9.58);
-let speed: Quantity<f32, si::meters_per_second> = distance / time;
+let distance: si::meters<f32> = Quantity::new(100.0);
+let time: si::seconds<f32> = Quantity::new(9.58);
+let speed: si::meters_per_second<f32> = distance / time;
 
 // This won't compile - can't add meters to seconds:
 // let wrong = distance + time;
@@ -27,39 +27,38 @@ uy = "0.1"
 ```rust
 use uy::{Quantity, si};
 
-let mass: Quantity<f64, si::kg> = Quantity::new(75.0);
-let force: Quantity<f64, si::N> = Quantity::new(100.0);
+let mass: si::kilograms<f64> = Quantity::new(75.0);
+let force: si::newtons<f64> = Quantity::new(100.0);
 ```
 
 ### Unit algebra
 
-Units combine through multiplication and division:
+Units combine through multiplication and division. All derived and compound units are just type aliases to combinations of `Mul`, `Div`, and base units:
 
 ```rust
 use uy::{Quantity, Mul, Div, si};
 
-let length: Quantity<f32, si::m> = Quantity::new(5.0);
-let width: Quantity<f32, si::m> = Quantity::new(3.0);
-let area: Quantity<f32, Mul<si::m, si::m>> = length * width;
+// These are equivalent:
+let v1: si::meters_per_second<f32> = Quantity::new(10.0);
+let v2: Quantity<f32, Div<si::units::m, si::units::s>> = Quantity::new(10.0);
 
-let time: Quantity<f32, si::s> = Quantity::new(2.0);
-let velocity: Quantity<f32, Div<si::m, si::s>> = length / time;
+// Unit algebra works automatically:
+let length: si::meters<f32> = Quantity::new(5.0);
+let width: si::meters<f32> = Quantity::new(3.0);
+let area: si::square_meters<f32> = length * width;  // m * m = m²
 ```
 
 ### Prefix conversions
 
-Scale is part of the type. Use `.convert()` to change scale:
+Scale is encoded in the type via `TenTo<N>`. Prefixes like `milli` and `kilo` are type aliases:
 
 ```rust
 use uy::{Quantity, si};
 
-let meters: Quantity<i32, si::m> = Quantity::new(5);
-let millimeters: Quantity<i32, si::milli<si::m>> = meters.convert();
+// si::milli<U> is just Mul<U, TenTo<-3>>
+let meters: si::meters<i32> = Quantity::new(5);
+let millimeters: Quantity<i32, si::milli<si::units::m>> = meters.convert();
 assert_eq!(*millimeters, 5000);
-
-let watts: Quantity<f64, si::W> = Quantity::new(1500.0);
-let kilowatts: Quantity<f64, si::kilo<si::W>> = watts.convert();
-assert_eq!(*kilowatts, 1.5);
 ```
 
 ### Accessing values
@@ -69,19 +68,15 @@ assert_eq!(*kilowatts, 1.5);
 ```rust
 use uy::{Quantity, si};
 
-let temp: Quantity<f32, si::K> = Quantity::new(293.15);
+let temp: si::kelvin<f32> = Quantity::new(293.15);
 println!("Temperature: {} K", *temp);
 ```
 
-## SI Units
+## Module structure
 
-**Base units:** `s`, `m`, `kg`, `A`, `K`, `mol`, `cd`, `rad`, `unitless`
-
-**Derived units:** `Hz`, `N`, `Pa`, `J`, `W`, `C`, `V`, `F`, `Ohm`, `S`, `Wb`, `T`, `H`, `Gy`, `Sv`, `Bq`, `lm`, `lx`, `kat`
-
-**Compound units:** `meters_per_second`, `meters_per_second_squared`, `square_meters`, `cubic_meters`, `kilograms_per_cubic_meter`, `radians_per_second`, `newton_meters`, `volts_per_meter`, `watts_per_square_meter`, and more.
-
-**Prefixes:** `quecto` through `quetta` (10⁻³⁰ to 10³⁰)
+- `si` - Quantity type aliases (`si::meters<T>`, `si::newtons<T>`, etc.)
+- `si::units` - Raw unit types for use with `Quantity<T, U>` and prefixes
+- `si::prefixes` - Scale prefixes (`milli`, `kilo`, etc.)
 
 ## License
 
