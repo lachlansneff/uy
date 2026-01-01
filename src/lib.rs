@@ -1,17 +1,17 @@
-use std::cmp;
-use std::hash;
-use std::marker::PhantomData;
+#![doc = include_str!("../README.md")]
+
 use std::ops;
-use std::ops::Deref;
-use std::ops::DerefMut;
 
 mod inner;
+mod quantity;
 pub mod si;
+
+pub use quantity::Quantity;
 
 /// Used for multiplying a unit by 10ⁿ.
 ///
 /// ```rust
-/// type Millimeter = uy::Mul<uy::si::m, uy::TenTo<-3>>;
+/// type Millimeter = uy::Mul<uy::si::units::m, uy::TenTo<-3>>;
 /// ```
 pub struct TenTo<const N: i8>;
 
@@ -60,7 +60,7 @@ macro_rules! power_of_ten_unit_system {
 
             impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::inner::ToConst for [<Typenum $system>]<crate::inner::Const<EXP>, $(crate::inner::Const<{ [<$unit:upper>] }>),*> {
                 type Output = $system<EXP, $({ [<$unit:upper>] }),*>;
-                fn to_const(self) -> Self::Output { Si }
+                fn to_const(self) -> Self::Output { $system }
             }
 
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -173,10 +173,79 @@ macro_rules! power_of_ten_unit_system {
                     val.mul_power_of_ten(EXP2 - EXP1)
                 }
             }
+
+            /// Base units for this unit system.
+            pub mod base {
+                #![allow(non_camel_case_types)]
+                use super::$system;
+
+                // Generate unitless (all zeros)
+                $crate::gen_unitless!(@acc $system; $($unit),*;);
+
+                // Generate each base unit type alias
+                $crate::gen_base_units!(@iter $system; ; $($unit),*);
+            }
         }
     }
 }
 pub(crate) use power_of_ten_unit_system;
+
+/// Generate `unitless` type alias with all zeros.
+#[doc(hidden)]
+macro_rules! gen_unitless {
+    // Done accumulating - emit the type
+    (@acc $system:ident; ; $($zeros:tt)*) => {
+        pub type unitless = $system<0 $($zeros)*>;
+    };
+    // Accumulate one more zero for each unit
+    (@acc $system:ident; $head:ident $(, $tail:ident)*; $($zeros:tt)*) => {
+        $crate::gen_unitless!(@acc $system; $($tail),*; $($zeros)*, 0);
+    };
+}
+pub(crate) use gen_unitless;
+
+/// Generate base unit type aliases by iterating through units.
+#[doc(hidden)]
+macro_rules! gen_base_units {
+    // Done iterating
+    (@iter $system:ident; $($before:ident),*;) => {};
+    // Process one unit, then recurse
+    (@iter $system:ident; ; $current:ident $(, $after:ident)*) => {
+        // First unit: no zeros before, just 1, then zeros after
+        $crate::gen_one_base!(@zeros_after $system; $current; [, 1]; $($after),*);
+        $crate::gen_base_units!(@iter $system; $current; $($after),*);
+    };
+    (@iter $system:ident; $($before:ident),+; $current:ident $(, $after:ident)*) => {
+        // Has units before: accumulate zeros, then 1, then zeros after
+        $crate::gen_one_base!(@zeros_before $system; $current; []; $($before),+; $($after),*);
+        $crate::gen_base_units!(@iter $system; $($before,)+ $current; $($after),*);
+    };
+}
+pub(crate) use gen_base_units;
+
+/// Generate a single base unit type alias.
+#[doc(hidden)]
+macro_rules! gen_one_base {
+    // Accumulate zeros for "before" units
+    (@zeros_before $system:ident; $current:ident; [$($acc:tt)*]; $head:ident; $($after:ident),*) => {
+        // Last "before" unit - add zero and move to "after" phase
+        $crate::gen_one_base!(@zeros_after $system; $current; [$($acc)*, 0, 1]; $($after),*);
+    };
+    (@zeros_before $system:ident; $current:ident; [$($acc:tt)*]; $head:ident, $($tail:ident),+; $($after:ident),*) => {
+        // More "before" units - add zero and continue
+        $crate::gen_one_base!(@zeros_before $system; $current; [$($acc)*, 0]; $($tail),+; $($after),*);
+    };
+    // Accumulate zeros for "after" units
+    (@zeros_after $system:ident; $current:ident; [$($acc:tt)*];) => {
+        // No more "after" units - emit the type
+        pub type $current = $system<0 $($acc)*>;
+    };
+    (@zeros_after $system:ident; $current:ident; [$($acc:tt)*]; $head:ident $(, $tail:ident)*) => {
+        // More "after" units - add zero and continue
+        $crate::gen_one_base!(@zeros_after $system; $current; [$($acc)*, 0]; $($tail),*);
+    };
+}
+pub(crate) use gen_one_base;
 
 /// Multiply a unit by another unit or [`TenTo`].
 pub type Mul<A, B> = <A as ops::Mul<B>>::Output;
@@ -188,156 +257,158 @@ pub trait UnitConvert<T, From>: Unit {
     fn unit_convert(val: T) -> T;
 }
 
-/// A physical quantity with a defined unit.
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct Quantity<T, U: Unit> {
-    val: T,
-    _marker: PhantomData<U>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cmp;
 
-impl<T, U: Unit> Quantity<T, U> {
-    /// Create a quantity from a value.
-    pub fn new(val: T) -> Self {
-        Self {
-            val,
-            _marker: PhantomData,
-        }
+    // =========================================================================
+    // Quantity struct behavior
+    // =========================================================================
+
+    #[test]
+    fn quantity_new_and_deref() {
+        let q: si::meters<i32> = Quantity::new(42);
+        assert_eq!(*q, 42);
     }
 
-    /// Convert between quantities with different units or the same units
-    /// with different scales.
-    ///
-    /// ```rust
-    /// # use uy::{si, Quantity};
-    /// let a: Quantity<i32, si::m> = Quantity::new(3);
-    /// let b: Quantity<i32, si::milli<si::m>> = a.convert();
-    /// assert_eq!(*b, 3000);
-    /// ```
-    pub fn convert<Y: UnitConvert<T, U>>(self) -> Quantity<T, Y> {
-        Quantity::new(Y::unit_convert(self.val))
+    #[test]
+    fn quantity_from_trait() {
+        let q: si::meters<i32> = 42.into();
+        assert_eq!(*q, 42);
     }
-}
 
-impl<T, U: Unit> Deref for Quantity<T, U> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &self.val
+    #[test]
+    fn quantity_equality_and_ordering() {
+        let a: si::meters<i32> = Quantity::new(5);
+        let b: si::meters<i32> = Quantity::new(5);
+        let c: si::meters<i32> = Quantity::new(10);
+        assert_eq!(a, b);
+        assert!(a < c);
+        assert_eq!(a.cmp(&c), cmp::Ordering::Less);
     }
-}
 
-impl<T, U: Unit> DerefMut for Quantity<T, U> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.val
+    #[test]
+    fn quantity_hash() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let a: si::meters<i32> = Quantity::new(42);
+        let b: si::meters<i32> = Quantity::new(42);
+
+        let mut hasher_a = DefaultHasher::new();
+        let mut hasher_b = DefaultHasher::new();
+        a.hash(&mut hasher_a);
+        b.hash(&mut hasher_b);
+        assert_eq!(hasher_a.finish(), hasher_b.finish());
     }
-}
 
-impl<T, U: Unit> From<T> for Quantity<T, U> {
-    fn from(val: T) -> Self {
-        Self::new(val)
+    // =========================================================================
+    // Arithmetic operations
+    // =========================================================================
+
+    #[test]
+    fn add_sub_same_units() {
+        let a: si::meters<i32> = Quantity::new(10);
+        let b: si::meters<i32> = Quantity::new(3);
+        assert_eq!(*(a + b), 13);
+        assert_eq!(*(a - b), 7);
     }
-}
 
-impl<T: Clone, U: Unit> Clone for Quantity<T, U> {
-    fn clone(&self) -> Self {
-        Self {
-            val: self.val.clone(),
-            _marker: PhantomData,
-        }
+    #[test]
+    fn mul_div_combines_units() {
+        // m * m = m^2, m^2 / m = m
+        let a: si::meters<i32> = Quantity::new(6);
+        let b: si::meters<i32> = Quantity::new(4);
+        let area: si::square_meters<i32> = a * b;
+        assert_eq!(*area, 24);
+
+        let c: si::meters<i32> = Quantity::new(3);
+        let result: si::meters<i32> = area / c;
+        assert_eq!(*result, 8);
     }
-}
 
-impl<T: Copy, U: Unit> Copy for Quantity<T, U> {}
-
-impl<T: PartialEq, U: Unit> PartialEq for Quantity<T, U> {
-    fn eq(&self, other: &Self) -> bool {
-        self.val == other.val
+    #[test]
+    fn division_to_unitless() {
+        let a: si::meters<i32> = Quantity::new(10);
+        let b: si::meters<i32> = Quantity::new(5);
+        let ratio: si::unitless<i32> = a / b;
+        assert_eq!(*ratio, 2);
     }
-}
 
-impl<T: Eq, U: Unit> Eq for Quantity<T, U> {}
+    // =========================================================================
+    // MulPowerOfTen trait (core conversion math)
+    // =========================================================================
 
-impl<T: PartialOrd, U: Unit> PartialOrd for Quantity<T, U> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.val.partial_cmp(&other.val)
+    #[test]
+    fn mul_power_of_ten_integers() {
+        // Negative exp multiplies, positive exp divides
+        assert_eq!(5i32.mul_power_of_ten(-3), 5000);
+        assert_eq!(5000i32.mul_power_of_ten(3), 5);
+        assert_eq!(42i32.mul_power_of_ten(0), 42);
     }
-}
 
-impl<T: Ord, U: Unit> Ord for Quantity<T, U> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.val.cmp(&other.val)
+    #[test]
+    fn mul_power_of_ten_floats() {
+        let up = 2.5f64.mul_power_of_ten(-3);
+        let down = 2500.0f64.mul_power_of_ten(3);
+        assert!((2500.0 - up).abs() < f64::EPSILON);
+        assert!((2.5 - down).abs() < f64::EPSILON);
     }
-}
 
-impl<T: hash::Hash, U: Unit> hash::Hash for Quantity<T, U> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.val.hash(state);
+    // =========================================================================
+    // Unit conversions
+    // =========================================================================
+
+    #[test]
+    fn conversion_scales_correctly() {
+        // m -> mm (scale up by 1000)
+        let meters: si::meters<i32> = Quantity::new(3);
+        let mm: Quantity<i32, si::milli<si::units::m>> = meters.convert();
+        assert_eq!(*mm, 3000);
+
+        // mm -> m (scale down by 1000)
+        let back: si::meters<i32> = mm.convert();
+        assert_eq!(*back, 3);
     }
-}
 
-impl<T, U: Unit> ops::Add<Self> for Quantity<T, U>
-where
-    T: ops::Add<Output = T>,
-{
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self {
-        Quantity {
-            val: self.val + rhs.val,
-            _marker: PhantomData,
-        }
+    #[test]
+    fn conversion_float() {
+        let km: Quantity<f64, si::kilo<si::units::m>> = Quantity::new(2.5);
+        let m: si::meters<f64> = km.convert();
+        assert!((2500.0 - *m).abs() < f64::EPSILON);
     }
-}
 
-impl<T, U: Unit> ops::Sub<Self> for Quantity<T, U>
-where
-    T: ops::Sub<Output = T>,
-{
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self {
-        Quantity {
-            val: self.val - rhs.val,
-            _marker: PhantomData,
-        }
+    #[test]
+    fn conversion_identity() {
+        let m: si::meters<i32> = Quantity::new(42);
+        let m2: si::meters<i32> = m.convert();
+        assert_eq!(*m, *m2);
     }
-}
 
-impl<T, U1: Unit, U2: Unit> ops::Mul<Quantity<T, U2>> for Quantity<T, U1>
-where
-    T: ops::Mul<Output = T>,
-    U1: ops::Mul<U2>,
-    <U1 as ops::Mul<U2>>::Output: Unit,
-{
-    type Output = Quantity<T, U1::Output>;
+    // =========================================================================
+    // Type algebra (unit combination correctness)
+    // =========================================================================
 
-    fn mul(self, rhs: Quantity<T, U2>) -> Self::Output {
-        Quantity {
-            val: self.val * rhs.val,
-            _marker: PhantomData,
-        }
+    #[test]
+    fn velocity_times_time_gives_distance() {
+        let velocity: si::meters_per_second<f64> = Quantity::new(10.0);
+        let time: si::seconds<f64> = Quantity::new(5.0);
+        let distance: si::meters<f64> = velocity * time;
+        assert!((50.0 - *distance).abs() < f64::EPSILON);
     }
-}
 
-impl<T, U1: Unit, U2: Unit> ops::Div<Quantity<T, U2>> for Quantity<T, U1>
-where
-    T: ops::Div<Output = T>,
-    U1: ops::Div<U2>,
-    <U1 as ops::Div<U2>>::Output: Unit,
-{
-    type Output = Quantity<T, U1::Output>;
+    #[test]
+    fn derived_unit_algebra() {
+        // kg * (m / s^2) = N
+        let mass: si::kilograms<f64> = Quantity::new(10.0);
+        let accel: si::meters_per_second_squared<f64> = Quantity::new(5.0);
+        let force: si::newtons<f64> = mass * accel;
+        assert!((50.0 - *force).abs() < f64::EPSILON);
 
-    fn div(self, rhs: Quantity<T, U2>) -> Self::Output {
-        Quantity {
-            val: self.val / rhs.val,
-            _marker: PhantomData,
-        }
+        // N * m = J
+        let distance: si::meters<f64> = Quantity::new(2.0);
+        let energy: si::joules<f64> = force * distance;
+        assert!((100.0 - *energy).abs() < f64::EPSILON);
     }
-}
-
-#[cfg(doctest)]
-mod test_readme {
-    #[doc = include_str!("../README.md")]
-    extern "C" {}
 }
