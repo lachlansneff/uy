@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use std::ops;
 
 mod inner;
@@ -255,12 +257,6 @@ pub trait UnitConvert<T, From>: Unit {
     fn unit_convert(val: T) -> T;
 }
 
-#[cfg(doctest)]
-mod test_readme {
-    #[doc = include_str!("../README.md")]
-    extern "C" {}
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,13 +276,6 @@ mod tests {
     fn quantity_from_trait() {
         let q: si::meters<i32> = 42.into();
         assert_eq!(*q, 42);
-    }
-
-    #[test]
-    fn quantity_deref_mut() {
-        let mut q: si::kilograms<i32> = Quantity::new(100);
-        *q = 200;
-        assert_eq!(*q, 200);
     }
 
     #[test]

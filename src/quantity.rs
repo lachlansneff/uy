@@ -3,7 +3,6 @@ use std::hash;
 use std::marker::PhantomData;
 use std::ops;
 use std::ops::Deref;
-use std::ops::DerefMut;
 
 use crate::{Unit, UnitConvert};
 
@@ -43,12 +42,6 @@ impl<T, U: Unit> Deref for Quantity<T, U> {
 
     fn deref(&self) -> &T {
         &self.val
-    }
-}
-
-impl<T, U: Unit> DerefMut for Quantity<T, U> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.val
     }
 }
 
