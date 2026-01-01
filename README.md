@@ -2,6 +2,8 @@
 
 Compile-time unit safety for Rust. Catches unit errors at compile time with zero runtime cost.
 
+See [docs.rs/uy](https://docs.rs/uy) for the full API.
+
 ```rust
 use uy::{Quantity, si};
 
