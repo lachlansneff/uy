@@ -7,9 +7,9 @@ See [docs.rs/uy](https://docs.rs/uy) for the full API.
 ```rust
 use uy::{Quantity, si};
 
-let distance: si::meters<f32> = Quantity::new(100.0);
-let time: si::seconds<f32> = Quantity::new(9.58);
-let speed: si::meters_per_second<f32> = distance / time;
+let distance: Quantity<f32, si::m> = Quantity::new(100.0);
+let time: Quantity<f32, si::s> = Quantity::new(9.58);
+let speed: Quantity<f32, si::meter_per_second> = distance / time;
 
 // This won't compile - can't add meters to seconds:
 // let wrong = distance + time;
@@ -19,7 +19,7 @@ let speed: si::meters_per_second<f32> = distance / time;
 
 ```toml
 [dependencies]
-uy = "0.2"
+uy = "0.3"
 ```
 
 ## Usage
@@ -29,8 +29,8 @@ uy = "0.2"
 ```rust
 use uy::{Quantity, si};
 
-let mass: si::kilograms<f64> = Quantity::new(75.0);
-let force: si::newtons<f64> = Quantity::new(100.0);
+let mass: Quantity<f64, si::kg> = Quantity::new(75.0);
+let force: Quantity<f64, si::N> = Quantity::new(100.0);
 ```
 
 ### Unit algebra
@@ -41,13 +41,13 @@ Units combine through multiplication and division. All derived and compound unit
 use uy::{Quantity, Mul, Div, si};
 
 // These are equivalent:
-let v1: si::meters_per_second<f32> = Quantity::new(10.0);
-let v2: Quantity<f32, Div<si::units::m, si::units::s>> = Quantity::new(10.0);
+let v1: Quantity<f32, si::meter_per_second> = Quantity::new(10.0);
+let v2: Quantity<f32, Div<si::m, si::s>> = Quantity::new(10.0);
 
 // Unit algebra works automatically:
-let length: si::meters<f32> = Quantity::new(5.0);
-let width: si::meters<f32> = Quantity::new(3.0);
-let area: si::square_meters<f32> = length * width;  // m * m = m²
+let length: Quantity<f32, si::m> = Quantity::new(5.0);
+let width: Quantity<f32, si::m> = Quantity::new(3.0);
+let area: Quantity<f32, si::square_meter> = length * width;  // m * m = m²
 ```
 
 ### Prefix conversions
@@ -58,8 +58,8 @@ Scale is encoded in the type via `TenTo<N>`. Prefixes like `milli` and `kilo` ar
 use uy::{Quantity, si};
 
 // si::milli<U> is just Mul<U, TenTo<-3>>
-let meters: si::meters<i32> = Quantity::new(5);
-let millimeters: Quantity<i32, si::milli<si::units::m>> = meters.convert();
+let meters: Quantity<i32, si::m> = Quantity::new(5);
+let millimeters: Quantity<i32, si::milli<si::m>> = meters.convert();
 assert_eq!(*millimeters, 5000);
 ```
 
@@ -70,15 +70,18 @@ assert_eq!(*millimeters, 5000);
 ```rust
 use uy::{Quantity, si};
 
-let temp: si::kelvin<f32> = Quantity::new(293.15);
+let temp: Quantity<f32, si::K> = Quantity::new(293.15);
 println!("Temperature: {} K", *temp);
 ```
 
-## Module structure
+## `no_std` Support
 
-- `si` - Quantity type aliases (`si::meters<T>`, `si::newtons<T>`, etc.)
-- `si::units` - Raw unit types for use with `Quantity<T, U>` and prefixes
-- `si::prefixes` - Scale prefixes (`milli`, `kilo`, etc.)
+This library supports compiling in `no_std` environments with nightly rust using the
+`core_float_math` feature. This feature is required to perform `powi` operations without
+`std`.
+
+To use this library without `std`, disable the default-features when depending on it. The
+`std` feature is enabled by default, which disables `no_std` support.
 
 ## License
 

@@ -1,17 +1,21 @@
+// When compiling without `std`, the `core_float_math` nightly feature is required.
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(core_float_math))]
+// Unit test code examples in the README.
 #![doc = include_str!("../README.md")]
 
-use std::ops;
+use core::ops;
 
 mod inner;
 mod quantity;
 pub mod si;
 
-pub use quantity::Quantity;
+pub use crate::quantity::Quantity;
 
 /// Used for multiplying a unit by 10ⁿ.
 ///
 /// ```rust
-/// type Millimeter = uy::Mul<uy::si::units::m, uy::TenTo<-3>>;
+/// type Millimeter = uy::Mul<uy::si::m, uy::TenTo<-3>>;
 /// ```
 pub struct TenTo<const N: i8>;
 
@@ -39,14 +43,26 @@ macro_rules! impl_mul_power_of_ten {
 impl_mul_power_of_ten!(i8, i16, i32, i64, isize, u8, u16, u32, u64, u128);
 
 impl MulPowerOfTen for f32 {
+    #[cfg(feature = "std")]
     fn mul_power_of_ten(self, exp: i8) -> Self {
         self * 10f32.powi(-exp as i32)
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn mul_power_of_ten(self, exp: i8) -> Self {
+        self * core::f32::math::powi(10.0, -exp as i32)
     }
 }
 
 impl MulPowerOfTen for f64 {
+    #[cfg(feature = "std")]
     fn mul_power_of_ten(self, exp: i8) -> Self {
         self * 10f64.powi(-exp as i32)
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn mul_power_of_ten(self, exp: i8) -> Self {
+        self * core::f64::math::powi(10.0, -exp as i32)
     }
 }
 
@@ -56,15 +72,34 @@ pub trait Unit {}
 macro_rules! power_of_ten_unit_system {
     ($system:ident { $($unit:ident),* }) => {
         ::paste::paste! {
-            pub struct [<Typenum $system>]<EXP, $([<$unit:camel>]),*>(std::marker::PhantomData<(EXP, $([<$unit:camel>]),*)>);
+            pub struct [<Typenum $system>]<EXP, $([<$unit:camel>]),*>(core::marker::PhantomData<(EXP, $([<$unit:camel>]),*)>);
 
             impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::inner::ToConst for [<Typenum $system>]<crate::inner::Const<EXP>, $(crate::inner::Const<{ [<$unit:upper>] }>),*> {
                 type Output = $system<EXP, $({ [<$unit:upper>] }),*>;
                 fn to_const(self) -> Self::Output { $system }
             }
 
+            /// Encoding of the unit system in the type system.
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub struct $system<const EXP: i8, $(const [<$unit:upper>]: i8),*>;
+
+            /// Encoding of the unit system as a value that can be interacted with at runtime.
+            #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
+            #[allow(non_snake_case)]
+            pub struct[<Runtime $system>] {
+                $(pub $unit: i8),*
+            }
+
+            /// Trait for converting from typesystem units to runtime units.
+            pub trait [<ToRuntime $system>] {
+                const VALUE: [<Runtime $system>];
+            }
+
+            impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> [<ToRuntime $system>] for $system<EXP, $({ [<$unit:upper>] }),*> {
+                const VALUE: [<Runtime $system>] = [<Runtime $system>] {
+                    $($unit: [<$unit:upper>]),*
+                };
+            }
 
             impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::Unit for $system<EXP, $({ [<$unit:upper>] }),*> {}
 
@@ -72,21 +107,21 @@ macro_rules! power_of_ten_unit_system {
                 const EXP: i8,
                 const N: i8,
                 $(const [<$unit:upper>]: i8),*
-            > std::ops::Mul<crate::TenTo<{ N }>> for $system<EXP, $({ [<$unit:upper>] }),*>
+            > core::ops::Mul<crate::TenTo<{ N }>> for $system<EXP, $({ [<$unit:upper>] }),*>
             where
-                crate::inner::Const<EXP>: std::ops::Add<crate::inner::Const<N>>,
+                crate::inner::Const<EXP>: core::ops::Add<crate::inner::Const<N>>,
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Add<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Add<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Add<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Add<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn mul(self, _rhs: crate::TenTo<N>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -94,21 +129,21 @@ macro_rules! power_of_ten_unit_system {
                 const EXP: i8,
                 const N: i8,
                 $(const [<$unit:upper>]: i8),*
-            > std::ops::Div<crate::TenTo<N>> for $system<EXP, $({ [<$unit:upper>] }),*>
+            > core::ops::Div<crate::TenTo<N>> for $system<EXP, $({ [<$unit:upper>] }),*>
             where
-                crate::inner::Const<EXP>: std::ops::Sub<crate::inner::Const<N>>,
+                crate::inner::Const<EXP>: core::ops::Sub<crate::inner::Const<N>>,
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Sub<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Sub<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Sub<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Sub<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn div(self, _rhs: crate::TenTo<N>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -116,23 +151,23 @@ macro_rules! power_of_ten_unit_system {
                 const EXP1: i8,
                 const EXP2: i8,
                 $(const [<$unit:upper 1>]: i8, const [<$unit:upper 2>]: i8),*
-            > std::ops::Mul<$system<EXP2, $({ [<$unit:upper 2>] }),*>> for $system<EXP1, $({ [<$unit:upper 1>] }),*>
+            > core::ops::Mul<$system<EXP2, $({ [<$unit:upper 2>] }),*>> for $system<EXP1, $({ [<$unit:upper 1>] }),*>
             where
-                crate::inner::Const<EXP1>: std::ops::Add<crate::inner::Const<EXP2>>,
+                crate::inner::Const<EXP1>: core::ops::Add<crate::inner::Const<EXP2>>,
 
-                $( crate::inner::Const<{ [<$unit:upper 1>] }>: std::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>, )*
+                $( crate::inner::Const<{ [<$unit:upper 1>] }>: core::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>, )*
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Add<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as std::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Add<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as core::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Add<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as std::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Add<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as core::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn mul(self, _rhs: $system<EXP2, $({ [<$unit:upper 2>] }),*>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -140,23 +175,23 @@ macro_rules! power_of_ten_unit_system {
                 const EXP1: i8,
                 const EXP2: i8,
                 $(const [<$unit:upper 1>]: i8, const [<$unit:upper 2>]: i8),*
-            > std::ops::Div<$system<EXP2, $([<$unit:upper 2>]),*>> for $system<EXP1, $([<$unit:upper 1>]),*>
+            > core::ops::Div<$system<EXP2, $([<$unit:upper 2>]),*>> for $system<EXP1, $([<$unit:upper 1>]),*>
             where
-                crate::inner::Const<EXP1>: std::ops::Sub<crate::inner::Const<EXP2>>,
+                crate::inner::Const<EXP1>: core::ops::Sub<crate::inner::Const<EXP2>>,
 
-                $( crate::inner::Const<[<$unit:upper 1>]>: std::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>, )*
+                $( crate::inner::Const<[<$unit:upper 1>]>: core::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>, )*
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Sub<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<[<$unit:upper 1>]> as std::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Sub<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<[<$unit:upper 1>]> as core::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Sub<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<[<$unit:upper 1>]> as std::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Sub<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<[<$unit:upper 1>]> as core::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn div(self, _rhs: $system<EXP2, $([<$unit:upper 2>]),*>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -179,8 +214,8 @@ macro_rules! power_of_ten_unit_system {
                 #![allow(non_camel_case_types)]
                 use super::$system;
 
-                // Generate unitless (all zeros)
-                $crate::gen_unitless!(@acc $system; $($unit),*;);
+                // Generate dimensionless (all zeros)
+                $crate::gen_dimensionless!(@acc $system; $($unit),*;);
 
                 // Generate each base unit type alias
                 $crate::gen_base_units!(@iter $system; ; $($unit),*);
@@ -190,19 +225,19 @@ macro_rules! power_of_ten_unit_system {
 }
 pub(crate) use power_of_ten_unit_system;
 
-/// Generate `unitless` type alias with all zeros.
+/// Generate `dimensionless` type alias with all zeros.
 #[doc(hidden)]
-macro_rules! gen_unitless {
+macro_rules! gen_dimensionless {
     // Done accumulating - emit the type
     (@acc $system:ident; ; $($zeros:tt)*) => {
-        pub type unitless = $system<0 $($zeros)*>;
+        pub type dimensionless = $system<0 $($zeros)*>;
     };
     // Accumulate one more zero for each unit
     (@acc $system:ident; $head:ident $(, $tail:ident)*; $($zeros:tt)*) => {
-        $crate::gen_unitless!(@acc $system; $($tail),*; $($zeros)*, 0);
+        $crate::gen_dimensionless!(@acc $system; $($tail),*; $($zeros)*, 0);
     };
 }
-pub(crate) use gen_unitless;
+pub(crate) use gen_dimensionless;
 
 /// Generate base unit type aliases by iterating through units.
 #[doc(hidden)]
@@ -259,6 +294,8 @@ pub trait UnitConvert<T, From>: Unit {
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
+
     use super::*;
     use std::cmp;
 
@@ -268,21 +305,21 @@ mod tests {
 
     #[test]
     fn quantity_new_and_deref() {
-        let q: si::meters<i32> = Quantity::new(42);
+        let q: Quantity<i32, si::m> = Quantity::new(42);
         assert_eq!(*q, 42);
     }
 
     #[test]
     fn quantity_from_trait() {
-        let q: si::meters<i32> = 42.into();
+        let q: Quantity<i32, si::m> = 42.into();
         assert_eq!(*q, 42);
     }
 
     #[test]
     fn quantity_equality_and_ordering() {
-        let a: si::meters<i32> = Quantity::new(5);
-        let b: si::meters<i32> = Quantity::new(5);
-        let c: si::meters<i32> = Quantity::new(10);
+        let a: Quantity<i32, si::m> = Quantity::new(5);
+        let b: Quantity<i32, si::m> = Quantity::new(5);
+        let c: Quantity<i32, si::m> = Quantity::new(10);
         assert_eq!(a, b);
         assert!(a < c);
         assert_eq!(a.cmp(&c), cmp::Ordering::Less);
@@ -293,8 +330,8 @@ mod tests {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        let a: si::meters<i32> = Quantity::new(42);
-        let b: si::meters<i32> = Quantity::new(42);
+        let a: Quantity<i32, si::m> = Quantity::new(42);
+        let b: Quantity<i32, si::m> = Quantity::new(42);
 
         let mut hasher_a = DefaultHasher::new();
         let mut hasher_b = DefaultHasher::new();
@@ -309,8 +346,8 @@ mod tests {
 
     #[test]
     fn add_sub_same_units() {
-        let a: si::meters<i32> = Quantity::new(10);
-        let b: si::meters<i32> = Quantity::new(3);
+        let a: Quantity<i32, si::m> = Quantity::new(10);
+        let b: Quantity<i32, si::m> = Quantity::new(3);
         assert_eq!(*(a + b), 13);
         assert_eq!(*(a - b), 7);
     }
@@ -318,21 +355,21 @@ mod tests {
     #[test]
     fn mul_div_combines_units() {
         // m * m = m^2, m^2 / m = m
-        let a: si::meters<i32> = Quantity::new(6);
-        let b: si::meters<i32> = Quantity::new(4);
-        let area: si::square_meters<i32> = a * b;
+        let a: Quantity<i32, si::m> = Quantity::new(6);
+        let b: Quantity<i32, si::m> = Quantity::new(4);
+        let area: Quantity<i32, si::square_meter> = a * b;
         assert_eq!(*area, 24);
 
-        let c: si::meters<i32> = Quantity::new(3);
-        let result: si::meters<i32> = area / c;
+        let c: Quantity<i32, si::m> = Quantity::new(3);
+        let result: Quantity<i32, si::m> = area / c;
         assert_eq!(*result, 8);
     }
 
     #[test]
-    fn division_to_unitless() {
-        let a: si::meters<i32> = Quantity::new(10);
-        let b: si::meters<i32> = Quantity::new(5);
-        let ratio: si::unitless<i32> = a / b;
+    fn division_to_dimensionless() {
+        let a: Quantity<i32, si::m> = Quantity::new(10);
+        let b: Quantity<i32, si::m> = Quantity::new(5);
+        let ratio: Quantity<i32, si::dimensionless> = a / b;
         assert_eq!(*ratio, 2);
     }
 
@@ -363,26 +400,33 @@ mod tests {
     #[test]
     fn conversion_scales_correctly() {
         // m -> mm (scale up by 1000)
-        let meters: si::meters<i32> = Quantity::new(3);
-        let mm: Quantity<i32, si::milli<si::units::m>> = meters.convert();
+        let meters: Quantity<i32, si::m> = Quantity::new(3);
+        let mm: Quantity<i32, si::milli<si::m>> = meters.convert();
         assert_eq!(*mm, 3000);
 
         // mm -> m (scale down by 1000)
-        let back: si::meters<i32> = mm.convert();
+        let back: Quantity<i32, si::m> = mm.convert();
         assert_eq!(*back, 3);
     }
 
     #[test]
-    fn conversion_float() {
-        let km: Quantity<f64, si::kilo<si::units::m>> = Quantity::new(2.5);
-        let m: si::meters<f64> = km.convert();
+    fn conversion_f32() {
+        let km: Quantity<f32, si::kilo<si::m>> = Quantity::new(2.5);
+        let m: Quantity<f32, si::m> = km.convert();
+        assert!((2500.0 - *m).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn conversion_f64() {
+        let km: Quantity<f64, si::kilo<si::m>> = Quantity::new(2.5);
+        let m: Quantity<f64, si::m> = km.convert();
         assert!((2500.0 - *m).abs() < f64::EPSILON);
     }
 
     #[test]
     fn conversion_identity() {
-        let m: si::meters<i32> = Quantity::new(42);
-        let m2: si::meters<i32> = m.convert();
+        let m: Quantity<i32, si::m> = Quantity::new(42);
+        let m2: Quantity<i32, si::m> = m.convert();
         assert_eq!(*m, *m2);
     }
 
@@ -392,23 +436,23 @@ mod tests {
 
     #[test]
     fn velocity_times_time_gives_distance() {
-        let velocity: si::meters_per_second<f64> = Quantity::new(10.0);
-        let time: si::seconds<f64> = Quantity::new(5.0);
-        let distance: si::meters<f64> = velocity * time;
+        let velocity: Quantity<f64, si::meter_per_second> = Quantity::new(10.0);
+        let time: Quantity<f64, si::s> = Quantity::new(5.0);
+        let distance: Quantity<f64, si::m> = velocity * time;
         assert!((50.0 - *distance).abs() < f64::EPSILON);
     }
 
     #[test]
     fn derived_unit_algebra() {
         // kg * (m / s^2) = N
-        let mass: si::kilograms<f64> = Quantity::new(10.0);
-        let accel: si::meters_per_second_squared<f64> = Quantity::new(5.0);
-        let force: si::newtons<f64> = mass * accel;
+        let mass: Quantity<f64, si::kg> = Quantity::new(10.0);
+        let accel: Quantity<f64, si::meter_per_second_squared> = Quantity::new(5.0);
+        let force: Quantity<f64, si::N> = mass * accel;
         assert!((50.0 - *force).abs() < f64::EPSILON);
 
         // N * m = J
-        let distance: si::meters<f64> = Quantity::new(2.0);
-        let energy: si::joules<f64> = force * distance;
+        let distance: Quantity<f64, si::m> = Quantity::new(2.0);
+        let energy: Quantity<f64, si::J> = force * distance;
         assert!((100.0 - *energy).abs() < f64::EPSILON);
     }
 }
