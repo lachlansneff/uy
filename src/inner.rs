@@ -1,4 +1,4 @@
-use std::ops;
+use core::ops;
 use typenum;
 
 pub struct Const<const I: i8>;

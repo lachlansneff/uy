@@ -1,8 +1,8 @@
-use std::cmp;
-use std::hash;
-use std::marker::PhantomData;
-use std::ops;
-use std::ops::Deref;
+use core::cmp;
+use core::hash;
+use core::marker::PhantomData;
+use core::ops;
+use core::ops::Deref;
 
 use crate::{Unit, UnitConvert};
 

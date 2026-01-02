@@ -80,6 +80,15 @@ println!("Temperature: {} K", *temp);
 - `si::units` - Raw unit types for use with `Quantity<T, U>` and prefixes
 - `si::prefixes` - Scale prefixes (`milli`, `kilo`, etc.)
 
+## `no_std` Support
+
+This library supports compiling in `no_std` environments with nightly rust using the
+`core_float_math` feature. This feature is required to perform `powi` operations without
+`std`.
+
+To use this library without `std`, disable the default-features when depending on it. The
+`std` feature is enabled by default, which disables `no_std` support.
+
 ## License
 
 MIT

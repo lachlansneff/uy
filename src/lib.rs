@@ -1,12 +1,16 @@
+// When compiling without `std`, the `core_float_math` nightly feature is required.
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(core_float_math))]
+// Unit test code examples in the README.
 #![doc = include_str!("../README.md")]
 
-use std::ops;
+use core::ops;
 
 mod inner;
 mod quantity;
 pub mod si;
 
-pub use quantity::Quantity;
+pub use crate::quantity::Quantity;
 
 /// Used for multiplying a unit by 10ⁿ.
 ///
@@ -39,14 +43,26 @@ macro_rules! impl_mul_power_of_ten {
 impl_mul_power_of_ten!(i8, i16, i32, i64, isize, u8, u16, u32, u64, u128);
 
 impl MulPowerOfTen for f32 {
+    #[cfg(feature = "std")]
     fn mul_power_of_ten(self, exp: i8) -> Self {
         self * 10f32.powi(-exp as i32)
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn mul_power_of_ten(self, exp: i8) -> Self {
+        self * core::f32::math::powi(10.0, -exp as i32)
     }
 }
 
 impl MulPowerOfTen for f64 {
+    #[cfg(feature = "std")]
     fn mul_power_of_ten(self, exp: i8) -> Self {
         self * 10f64.powi(-exp as i32)
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn mul_power_of_ten(self, exp: i8) -> Self {
+        self * core::f64::math::powi(10.0, -exp as i32)
     }
 }
 
@@ -56,7 +72,7 @@ pub trait Unit {}
 macro_rules! power_of_ten_unit_system {
     ($system:ident { $($unit:ident),* }) => {
         ::paste::paste! {
-            pub struct [<Typenum $system>]<EXP, $([<$unit:camel>]),*>(std::marker::PhantomData<(EXP, $([<$unit:camel>]),*)>);
+            pub struct [<Typenum $system>]<EXP, $([<$unit:camel>]),*>(core::marker::PhantomData<(EXP, $([<$unit:camel>]),*)>);
 
             impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::inner::ToConst for [<Typenum $system>]<crate::inner::Const<EXP>, $(crate::inner::Const<{ [<$unit:upper>] }>),*> {
                 type Output = $system<EXP, $({ [<$unit:upper>] }),*>;
@@ -66,27 +82,43 @@ macro_rules! power_of_ten_unit_system {
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub struct $system<const EXP: i8, $(const [<$unit:upper>]: i8),*>;
 
+            #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
+            #[allow(non_snake_case)]
+            pub struct[<Runtime $system>] {
+                $(pub $unit: i8),*
+            }
+
+            pub trait [<ToRuntime $system>] {
+                const VALUE: [<Runtime $system>];
+            }
+
+            impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> [<ToRuntime $system>] for $system<EXP, $({ [<$unit:upper>] }),*> {
+                const VALUE: [<Runtime $system>] = [<Runtime $system>] {
+                    $($unit: [<$unit:upper>]),*
+                };
+            }
+
             impl<const EXP: i8, $(const [<$unit:upper>]: i8),*> crate::Unit for $system<EXP, $({ [<$unit:upper>] }),*> {}
 
             impl<
                 const EXP: i8,
                 const N: i8,
                 $(const [<$unit:upper>]: i8),*
-            > std::ops::Mul<crate::TenTo<{ N }>> for $system<EXP, $({ [<$unit:upper>] }),*>
+            > core::ops::Mul<crate::TenTo<{ N }>> for $system<EXP, $({ [<$unit:upper>] }),*>
             where
-                crate::inner::Const<EXP>: std::ops::Add<crate::inner::Const<N>>,
+                crate::inner::Const<EXP>: core::ops::Add<crate::inner::Const<N>>,
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Add<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Add<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Add<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Add<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn mul(self, _rhs: crate::TenTo<N>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -94,21 +126,21 @@ macro_rules! power_of_ten_unit_system {
                 const EXP: i8,
                 const N: i8,
                 $(const [<$unit:upper>]: i8),*
-            > std::ops::Div<crate::TenTo<N>> for $system<EXP, $({ [<$unit:upper>] }),*>
+            > core::ops::Div<crate::TenTo<N>> for $system<EXP, $({ [<$unit:upper>] }),*>
             where
-                crate::inner::Const<EXP>: std::ops::Sub<crate::inner::Const<N>>,
+                crate::inner::Const<EXP>: core::ops::Sub<crate::inner::Const<N>>,
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Sub<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Sub<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP> as std::ops::Sub<crate::inner::Const<N>>>::Output,
+                    <crate::inner::Const<EXP> as core::ops::Sub<crate::inner::Const<N>>>::Output,
                     $( crate::inner::Const<{ [<$unit:upper>] }> ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn div(self, _rhs: crate::TenTo<N>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -116,23 +148,23 @@ macro_rules! power_of_ten_unit_system {
                 const EXP1: i8,
                 const EXP2: i8,
                 $(const [<$unit:upper 1>]: i8, const [<$unit:upper 2>]: i8),*
-            > std::ops::Mul<$system<EXP2, $({ [<$unit:upper 2>] }),*>> for $system<EXP1, $({ [<$unit:upper 1>] }),*>
+            > core::ops::Mul<$system<EXP2, $({ [<$unit:upper 2>] }),*>> for $system<EXP1, $({ [<$unit:upper 1>] }),*>
             where
-                crate::inner::Const<EXP1>: std::ops::Add<crate::inner::Const<EXP2>>,
+                crate::inner::Const<EXP1>: core::ops::Add<crate::inner::Const<EXP2>>,
 
-                $( crate::inner::Const<{ [<$unit:upper 1>] }>: std::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>, )*
+                $( crate::inner::Const<{ [<$unit:upper 1>] }>: core::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>, )*
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Add<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as std::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Add<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as core::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Add<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as std::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Add<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<{ [<$unit:upper 1>] }> as core::ops::Add<crate::inner::Const<{ [<$unit:upper 2>] }>>>::Output ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn mul(self, _rhs: $system<EXP2, $({ [<$unit:upper 2>] }),*>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -140,23 +172,23 @@ macro_rules! power_of_ten_unit_system {
                 const EXP1: i8,
                 const EXP2: i8,
                 $(const [<$unit:upper 1>]: i8, const [<$unit:upper 2>]: i8),*
-            > std::ops::Div<$system<EXP2, $([<$unit:upper 2>]),*>> for $system<EXP1, $([<$unit:upper 1>]),*>
+            > core::ops::Div<$system<EXP2, $([<$unit:upper 2>]),*>> for $system<EXP1, $([<$unit:upper 1>]),*>
             where
-                crate::inner::Const<EXP1>: std::ops::Sub<crate::inner::Const<EXP2>>,
+                crate::inner::Const<EXP1>: core::ops::Sub<crate::inner::Const<EXP2>>,
 
-                $( crate::inner::Const<[<$unit:upper 1>]>: std::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>, )*
+                $( crate::inner::Const<[<$unit:upper 1>]>: core::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>, )*
                 [<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Sub<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<[<$unit:upper 1>]> as std::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Sub<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<[<$unit:upper 1>]> as core::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
                 >: crate::inner::ToConst,
             {
                 type Output = <[<Typenum $system>]<
-                    <crate::inner::Const<EXP1> as std::ops::Sub<crate::inner::Const<EXP2>>>::Output,
-                    $( <crate::inner::Const<[<$unit:upper 1>]> as std::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
+                    <crate::inner::Const<EXP1> as core::ops::Sub<crate::inner::Const<EXP2>>>::Output,
+                    $( <crate::inner::Const<[<$unit:upper 1>]> as core::ops::Sub<crate::inner::Const<[<$unit:upper 2>]>>>::Output ),*
                 > as crate::inner::ToConst>::Output;
 
                 fn div(self, _rhs: $system<EXP2, $([<$unit:upper 2>]),*>) -> Self::Output {
-                    crate::inner::ToConst::to_const([<Typenum $system>](std::marker::PhantomData))
+                    crate::inner::ToConst::to_const([<Typenum $system>](core::marker::PhantomData))
                 }
             }
 
@@ -259,6 +291,8 @@ pub trait UnitConvert<T, From>: Unit {
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
+
     use super::*;
     use std::cmp;
 

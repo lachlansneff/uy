@@ -30,7 +30,7 @@ pub mod units {
     }
 
     pub use self::inner::base::*;
-    pub use self::inner::Si;
+    pub use self::inner::{RuntimeSi, Si, ToRuntimeSi};
 
     pub mod derived {
         //! SI derived unit types.
