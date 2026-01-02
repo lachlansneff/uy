@@ -28,8 +28,9 @@ impl<T, U: Unit> Quantity<T, U> {
     ///
     /// ```rust
     /// # use uy::{si, Quantity};
-    /// let a: si::meters<i32> = Quantity::new(3);
-    /// let b: Quantity<i32, si::milli<si::units::m>> = a.convert();
+    ///
+    /// let a: Quantity<i32, si::m> = Quantity::new(3);
+    /// let b: Quantity<i32, si::milli<si::m>> = a.convert();
     /// assert_eq!(*b, 3000);
     /// ```
     pub fn convert<Y: UnitConvert<T, U>>(self) -> Quantity<T, Y> {

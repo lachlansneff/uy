@@ -1,3 +1,7 @@
+//! Utilities for converting to and from const generics and typenum.
+//!
+//! Const generics are nicer to deal with but we need typenum to actually implement the math operations.
+
 use core::ops;
 use typenum;
 

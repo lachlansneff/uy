@@ -15,7 +15,7 @@ pub use crate::quantity::Quantity;
 /// Used for multiplying a unit by 10ⁿ.
 ///
 /// ```rust
-/// type Millimeter = uy::Mul<uy::si::units::m, uy::TenTo<-3>>;
+/// type Millimeter = uy::Mul<uy::si::m, uy::TenTo<-3>>;
 /// ```
 pub struct TenTo<const N: i8>;
 
@@ -79,15 +79,18 @@ macro_rules! power_of_ten_unit_system {
                 fn to_const(self) -> Self::Output { $system }
             }
 
+            /// Encoding of the unit system in the type system.
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub struct $system<const EXP: i8, $(const [<$unit:upper>]: i8),*>;
 
+            /// Encoding of the unit system as a value that can be interacted with at runtime.
             #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
             #[allow(non_snake_case)]
             pub struct[<Runtime $system>] {
                 $(pub $unit: i8),*
             }
 
+            /// Trait for converting from typesystem units to runtime units.
             pub trait [<ToRuntime $system>] {
                 const VALUE: [<Runtime $system>];
             }
@@ -211,8 +214,8 @@ macro_rules! power_of_ten_unit_system {
                 #![allow(non_camel_case_types)]
                 use super::$system;
 
-                // Generate unitless (all zeros)
-                $crate::gen_unitless!(@acc $system; $($unit),*;);
+                // Generate dimensionless (all zeros)
+                $crate::gen_dimensionless!(@acc $system; $($unit),*;);
 
                 // Generate each base unit type alias
                 $crate::gen_base_units!(@iter $system; ; $($unit),*);
@@ -222,19 +225,19 @@ macro_rules! power_of_ten_unit_system {
 }
 pub(crate) use power_of_ten_unit_system;
 
-/// Generate `unitless` type alias with all zeros.
+/// Generate `dimensionless` type alias with all zeros.
 #[doc(hidden)]
-macro_rules! gen_unitless {
+macro_rules! gen_dimensionless {
     // Done accumulating - emit the type
     (@acc $system:ident; ; $($zeros:tt)*) => {
-        pub type unitless = $system<0 $($zeros)*>;
+        pub type dimensionless = $system<0 $($zeros)*>;
     };
     // Accumulate one more zero for each unit
     (@acc $system:ident; $head:ident $(, $tail:ident)*; $($zeros:tt)*) => {
-        $crate::gen_unitless!(@acc $system; $($tail),*; $($zeros)*, 0);
+        $crate::gen_dimensionless!(@acc $system; $($tail),*; $($zeros)*, 0);
     };
 }
-pub(crate) use gen_unitless;
+pub(crate) use gen_dimensionless;
 
 /// Generate base unit type aliases by iterating through units.
 #[doc(hidden)]
@@ -302,21 +305,21 @@ mod tests {
 
     #[test]
     fn quantity_new_and_deref() {
-        let q: si::meters<i32> = Quantity::new(42);
+        let q: Quantity<i32, si::m> = Quantity::new(42);
         assert_eq!(*q, 42);
     }
 
     #[test]
     fn quantity_from_trait() {
-        let q: si::meters<i32> = 42.into();
+        let q: Quantity<i32, si::m> = 42.into();
         assert_eq!(*q, 42);
     }
 
     #[test]
     fn quantity_equality_and_ordering() {
-        let a: si::meters<i32> = Quantity::new(5);
-        let b: si::meters<i32> = Quantity::new(5);
-        let c: si::meters<i32> = Quantity::new(10);
+        let a: Quantity<i32, si::m> = Quantity::new(5);
+        let b: Quantity<i32, si::m> = Quantity::new(5);
+        let c: Quantity<i32, si::m> = Quantity::new(10);
         assert_eq!(a, b);
         assert!(a < c);
         assert_eq!(a.cmp(&c), cmp::Ordering::Less);
@@ -327,8 +330,8 @@ mod tests {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        let a: si::meters<i32> = Quantity::new(42);
-        let b: si::meters<i32> = Quantity::new(42);
+        let a: Quantity<i32, si::m> = Quantity::new(42);
+        let b: Quantity<i32, si::m> = Quantity::new(42);
 
         let mut hasher_a = DefaultHasher::new();
         let mut hasher_b = DefaultHasher::new();
@@ -343,8 +346,8 @@ mod tests {
 
     #[test]
     fn add_sub_same_units() {
-        let a: si::meters<i32> = Quantity::new(10);
-        let b: si::meters<i32> = Quantity::new(3);
+        let a: Quantity<i32, si::m> = Quantity::new(10);
+        let b: Quantity<i32, si::m> = Quantity::new(3);
         assert_eq!(*(a + b), 13);
         assert_eq!(*(a - b), 7);
     }
@@ -352,21 +355,21 @@ mod tests {
     #[test]
     fn mul_div_combines_units() {
         // m * m = m^2, m^2 / m = m
-        let a: si::meters<i32> = Quantity::new(6);
-        let b: si::meters<i32> = Quantity::new(4);
-        let area: si::square_meters<i32> = a * b;
+        let a: Quantity<i32, si::m> = Quantity::new(6);
+        let b: Quantity<i32, si::m> = Quantity::new(4);
+        let area: Quantity<i32, si::square_meter> = a * b;
         assert_eq!(*area, 24);
 
-        let c: si::meters<i32> = Quantity::new(3);
-        let result: si::meters<i32> = area / c;
+        let c: Quantity<i32, si::m> = Quantity::new(3);
+        let result: Quantity<i32, si::m> = area / c;
         assert_eq!(*result, 8);
     }
 
     #[test]
-    fn division_to_unitless() {
-        let a: si::meters<i32> = Quantity::new(10);
-        let b: si::meters<i32> = Quantity::new(5);
-        let ratio: si::unitless<i32> = a / b;
+    fn division_to_dimensionless() {
+        let a: Quantity<i32, si::m> = Quantity::new(10);
+        let b: Quantity<i32, si::m> = Quantity::new(5);
+        let ratio: Quantity<i32, si::dimensionless> = a / b;
         assert_eq!(*ratio, 2);
     }
 
@@ -397,26 +400,33 @@ mod tests {
     #[test]
     fn conversion_scales_correctly() {
         // m -> mm (scale up by 1000)
-        let meters: si::meters<i32> = Quantity::new(3);
-        let mm: Quantity<i32, si::milli<si::units::m>> = meters.convert();
+        let meters: Quantity<i32, si::m> = Quantity::new(3);
+        let mm: Quantity<i32, si::milli<si::m>> = meters.convert();
         assert_eq!(*mm, 3000);
 
         // mm -> m (scale down by 1000)
-        let back: si::meters<i32> = mm.convert();
+        let back: Quantity<i32, si::m> = mm.convert();
         assert_eq!(*back, 3);
     }
 
     #[test]
-    fn conversion_float() {
-        let km: Quantity<f64, si::kilo<si::units::m>> = Quantity::new(2.5);
-        let m: si::meters<f64> = km.convert();
+    fn conversion_f32() {
+        let km: Quantity<f32, si::kilo<si::m>> = Quantity::new(2.5);
+        let m: Quantity<f32, si::m> = km.convert();
+        assert!((2500.0 - *m).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn conversion_f64() {
+        let km: Quantity<f64, si::kilo<si::m>> = Quantity::new(2.5);
+        let m: Quantity<f64, si::m> = km.convert();
         assert!((2500.0 - *m).abs() < f64::EPSILON);
     }
 
     #[test]
     fn conversion_identity() {
-        let m: si::meters<i32> = Quantity::new(42);
-        let m2: si::meters<i32> = m.convert();
+        let m: Quantity<i32, si::m> = Quantity::new(42);
+        let m2: Quantity<i32, si::m> = m.convert();
         assert_eq!(*m, *m2);
     }
 
@@ -426,23 +436,23 @@ mod tests {
 
     #[test]
     fn velocity_times_time_gives_distance() {
-        let velocity: si::meters_per_second<f64> = Quantity::new(10.0);
-        let time: si::seconds<f64> = Quantity::new(5.0);
-        let distance: si::meters<f64> = velocity * time;
+        let velocity: Quantity<f64, si::meter_per_second> = Quantity::new(10.0);
+        let time: Quantity<f64, si::s> = Quantity::new(5.0);
+        let distance: Quantity<f64, si::m> = velocity * time;
         assert!((50.0 - *distance).abs() < f64::EPSILON);
     }
 
     #[test]
     fn derived_unit_algebra() {
         // kg * (m / s^2) = N
-        let mass: si::kilograms<f64> = Quantity::new(10.0);
-        let accel: si::meters_per_second_squared<f64> = Quantity::new(5.0);
-        let force: si::newtons<f64> = mass * accel;
+        let mass: Quantity<f64, si::kg> = Quantity::new(10.0);
+        let accel: Quantity<f64, si::meter_per_second_squared> = Quantity::new(5.0);
+        let force: Quantity<f64, si::N> = mass * accel;
         assert!((50.0 - *force).abs() < f64::EPSILON);
 
         // N * m = J
-        let distance: si::meters<f64> = Quantity::new(2.0);
-        let energy: si::joules<f64> = force * distance;
+        let distance: Quantity<f64, si::m> = Quantity::new(2.0);
+        let energy: Quantity<f64, si::J> = force * distance;
         assert!((100.0 - *energy).abs() < f64::EPSILON);
     }
 }
